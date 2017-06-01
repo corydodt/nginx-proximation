@@ -2,17 +2,12 @@
 FROM alpine:3.5
 
 RUN mkdir -p /usr/share/nginx/html /run/nginx /opt/Proximation
-ENV PYTHONPATH=/opt/Proximation PYTHONUNBUFFERED=true
+ENV PYTHONPATH=/opt/Proximation
 WORKDIR /opt/Proximation
 
-COPY ./get-pip.py \
-     ./requirements.txt \
-     ./http.conf.in \
+COPY ./requirements.txt \
      ./circus.ini \
-     ./proximation.py \
     /opt/Proximation/
-
-COPY ./codado /opt/Proximation/codado
 
 RUN apk update \
     && apk add --no-cache --virtual build-dependencies \
@@ -24,20 +19,23 @@ RUN apk update \
     && apk add --no-cache \
         bash \
         ca-certificates \
+        coreutils \
         # g++ required for circusd's use of cython
         g++ \
         net-tools \
         nginx \
         openssl \
         python \
-    && python /opt/Proximation/get-pip.py \
-    && pip install --no-cache-dir -U pip \
+    && python -m ensurepip \
     && pip install -U --no-cache-dir -r /opt/Proximation/requirements.txt \
-    && rm /opt/Proximation/get-pip.py \
     && apk del build-dependencies
+
+COPY ./http.conf.in \
+     ./proximation.py \
+    /opt/Proximation/
 
 EXPOSE 80 443
 
-ENTRYPOINT ["circusd"]
+ENTRYPOINT ["stdbuf", "-oL", "circusd"]
 CMD ["/opt/Proximation/circus.ini"]
 
