@@ -1,7 +1,7 @@
 # vim:set ft=dockerfile:
 FROM alpine:3.5
 
-RUN mkdir -p /usr/share/nginx/html /run/nginx /opt/Proximation
+RUN mkdir -p /usr/share/nginx/html /run/nginx /opt/Proximation /etc/letsencrypt/live
 ENV PYTHONPATH=/opt/Proximation
 WORKDIR /opt/Proximation
 
