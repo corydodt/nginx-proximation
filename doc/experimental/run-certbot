@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -euo pipefail
+
+certbot_flags=--staging
+certbot_email=corydodt@gmail.com
+
+certbot $certbot_flags certonly --webroot -w /usr/share/nginx/html \
+        -n --agree-tos -m $certbot_email \
+        --preferred-challenges http-01 \
+        -d $public_hostname | grep Congratulations
