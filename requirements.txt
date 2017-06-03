@@ -3,5 +3,6 @@ certbot>=0.11.1
 circus
 docker
 jinja2
+pyflakes
 service_identity
 twisted
