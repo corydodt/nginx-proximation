@@ -19,6 +19,7 @@ from codado.dockerish import DockerEngine
 TEMPLATE = 'http.conf.in'
 TEMPLATE_OUT = '/etc/nginx/conf.d/default.conf'
 NGINX_PIDFILE = '/run/nginx/nginx.pid'
+LETSENCRYPT_LIVE = '/etc/letsencrypt/live'
 
 
 @attr.s
@@ -74,8 +75,8 @@ class EventWatcher(object):
 
     @property
     def pemsAvailable(self):
-        return [d for d in os.listdir('/etc/letsencrypt/live') if
-                os.path.isdir(d)]
+        return [d for d in os.listdir(LETSENCRYPT_LIVE) if
+                os.path.isdir("%s/%s" % (LETSENCRYPT_LIVE, d))]
 
     def reload(self):
         """
