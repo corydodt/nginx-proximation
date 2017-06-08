@@ -4,10 +4,11 @@ The proximation service
 """
 import os
 import signal
+import shlex
 
-import yaml
-
-from twisted.internet import reactor
+from twisted.internet import reactor, utils
+from twisted.python.procutils import which
+from twisted.python import log
 
 import attr
 
@@ -20,6 +21,20 @@ TEMPLATE = 'http.conf.in'
 TEMPLATE_OUT = '/etc/nginx/conf.d/default.conf'
 NGINX_PIDFILE = '/run/nginx/nginx.pid'
 LETSENCRYPT_LIVE = '/etc/letsencrypt/live'
+NGINX_WEBROOT = '/usr/share/nginx/html'
+
+
+@attr.s
+class VHost(object):
+    """
+    A record of a vhost being tracked by proximation
+    """
+    public_hostname = attr.ib()
+    containers = attr.ib(default=attr.Factory(set))
+
+    @property
+    def hasPEM(self):
+        return os.path.isdir('%s/%s' % (LETSENCRYPT_LIVE, self.public_hostname))
 
 
 @attr.s
@@ -35,23 +50,26 @@ class EventWatcher(object):
         """
         Rebuild internal container dict by looking at existing containers
 
-        Returns a set of differences if the containers have changed
+        => True/False :: True if the container list has changed as a result of this event
         """
-        kv = lambda s: s.split('=', 1)
         running = self.engine.client.containers.list(filters={'status':'running'})
+
         vhosts = {}
+
+        kv = lambda s: s.split('=', 1)
         for c in running:
             env = {k: v for (k, v) in (kv(s) for s in c.attrs['Config']['Env'])}
-            if 'virtual_host' in env:
-                vhosts.setdefault(env['virtual_host'], []).append(c)
-        if vhosts != self._virtualHosts:
-            self._virtualHosts = vhosts
-            u8 = lambda x: x.encode('utf-8')
-            hn = lambda con: u8(con.attrs['Config']['Hostname'])
-            fmtd = {u8(x): map(hn, y) for (x, y) in vhosts.items()}
-            return yaml.dump(fmtd, default_flow_style=False)
+            if u'virtual_host' in env:
+                public_hostname = env[u'virtual_host']
+                vh = vhosts.get(public_hostname) or VHost(public_hostname=public_hostname)
+                vh.containers.add(c)
+                vhosts[public_hostname] = vh
 
-        return False
+        # have we changed?
+        ret = vhosts != self._virtualHosts
+
+        self._virtualHosts = vhosts
+        return ret
 
     @engine.handler("dockerish.init")
     @engine.handler("container.stop")
@@ -67,16 +85,22 @@ class EventWatcher(object):
         print event.name
         modified = self._scanContainers()
         if modified:
-            self.render(TEMPLATE, event)
+            self.render()
+            print 'Rendered %r' % TEMPLATE_OUT
             # TODO: defer this a few seconds
             self.reload()
-            print 'Hosts:'
-            print modified
+            for vh in self._virtualHosts.values():
+                # FIXME - certbot will only run 1 at a time, so these have to
+                # be chained together
+                self.ensurePEM(vh)
+            self.showHosts()
 
-    @property
-    def pemsAvailable(self):
-        return [d for d in os.listdir(LETSENCRYPT_LIVE) if
-                os.path.isdir("%s/%s" % (LETSENCRYPT_LIVE, d))]
+    def showHosts(self):
+        print "Now:"
+        for k, vh in self._virtualHosts.items():
+            tls = '[TLS]' if vh.hasPEM else ''
+            conts = [c.attrs['Config']['Hostname'] for c in vh.containers]
+            print "  %s%s: %s" % (k, tls, ' '.join(conts))
 
     def reload(self):
         """
@@ -86,22 +110,50 @@ class EventWatcher(object):
         pid = int(open(NGINX_PIDFILE).read())
         os.kill(pid, signal.SIGHUP)
 
-    def render(self, tplFile, event):
+    def render(self):
         """
-        Render the template 
+        Render the template
         """
-        inputFile = open(tplFile, 'rb')
+        inputFile = open(TEMPLATE, 'rb')
         tpl = Template(inputFile.read())
         env = dict(__environ__=os.environ,
-                event=event,
-                virtual_hosts=self._virtualHosts,
-                https_conf={k: 1 for k in self.pemsAvailable},
+                virtual_hosts=self._virtualHosts.values(),
                 **os.environ)
         open(TEMPLATE_OUT, 'wb').write(
             tpl.render(**env)
             )
-        print 'Rendered %r' % TEMPLATE_OUT
 
+    def ensurePEM(self, vhost):
+        """
+        Run certbot to get the PEM for this vhost, if necessary
+        """
+        if vhost.hasPEM:
+            return
+
+        pathCertbot = which('certbot')[0]
+        args = shlex.split(
+            '{flags} certonly -n '
+            '--agree-tos -m {email} '
+            '--webroot -w {webroot} '
+            '--preferred-challenges http-01 '
+            '-d {ph}'.format(
+                webroot=NGINX_WEBROOT,
+                ph=vhost.public_hostname,
+                flags=os.environ.get('certbot_flags', ''),
+                email=os.environ['certbot_email'],
+                )
+            )
+        print "Attempting to get cert for %r" % vhost.public_hostname
+        d = utils.getProcessOutputAndValue(pathCertbot, args)
+        d.addCallback(self.onCertbot, vhost).addErrback(log.err)
+
+    def onCertbot(self, (out, err, code), vhost):
+        bad = "certbot failed:\n%r\n%r\n" % (out, err)
+        assert code == 0 and 'Congratulations' in out,  bad
+
+        self.render()
+        self.reload()
+        self.showHosts()
 
 def main():
     ew = EventWatcher()

@@ -3,6 +3,7 @@
 set -euo pipefail
 export IFS=$'\n'
 
+mkdir -p letsencrypt
 prox=/opt/Proximation
 docker run -d \
     -v `pwd`/proximation.py:$prox/proximation.py \
@@ -11,6 +12,7 @@ docker run -d \
     -v `pwd`/codado:$prox/codado \
     -v `pwd`/doc/experimental/run-certbot:$prox/run-certbot \
     -v /var/run/docker.sock:/var/run/docker.sock \
+    -v `pwd`/letsencrypt:/etc/letsencrypt \
     --env-file=envfile \
     -p 8080:80 \
     corydodt/nginx-proximation:latest

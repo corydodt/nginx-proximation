@@ -1,13 +1,18 @@
-{% for public_hostname, containers in virtual_hosts.items() -%}
+{% for vhost in virtual_hosts|sort %}
 
-upstream {{ public_hostname }} {
-    {%- for us_host in containers %}
-    server {{ us_host.attrs.NetworkSettings.IPAddress }}:8080;
+# {{ '-' * vhost.public_hostname|length }}
+# {{ vhost.public_hostname }}
+# {{ '-' * vhost.public_hostname|length }}
+
+upstream {{ vhost.public_hostname }} {
+    {%- for upstream in vhost.containers %}
+    # TODO: make port 8080 configurable
+    server {{ upstream.attrs.NetworkSettings.IPAddress }}:8080;
     {%- endfor %}
 }
 
 server {
-    server_name {{ public_hostname }};
+    server_name {{ vhost.public_hostname }};
     listen 80;
 
     location ~ /\.well-known/.* {
@@ -16,19 +21,19 @@ server {
     }
 
 
-{% if https_conf[public_hostname] -%}
+{% if vhost.hasPEM -%}
 
     location ~ /.* {
-        proxy_pass http://{{ public_hostname }};
+        proxy_pass http://{{ vhost.public_hostname }};
     }
 
     listen 443 ssl;
 
-    ssl_certificate /etc/letsencrypt/live/{{ public_hostname }}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/{{ public_hostname }}/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/{{ vhost.public_hostname }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ vhost.public_hostname }}/privkey.pem;
 
-    if ($scheme != "https") { 
-        return 301 https://$host$request_uri; 
+    if ($scheme != "https") {
+        return 301 https://$host$request_uri;
     }
 
     ssl_session_cache shared:le_nginx_SSL:10m;
