@@ -6,7 +6,7 @@ import os
 import signal
 import shlex
 
-from twisted.internet import reactor, utils
+from twisted.internet import reactor, utils, defer, task
 from twisted.python.procutils import which
 from twisted.python import log
 
@@ -82,20 +82,26 @@ class EventWatcher(object):
         """
         Rebuild the nginx config
         """
-        print event.name
         modified = self._scanContainers()
         if modified:
             self.render()
             print 'Rendered %r' % TEMPLATE_OUT
-            # TODO: defer this a few seconds
-            self.reload()
-            for vh in self._virtualHosts.values():
-                # FIXME - certbot will only run 1 at a time, so these have to
-                # be chained together
-                self.ensurePEM(vh)
-            self.showHosts()
+            self._postRender()
+
+    def _postRender(self):
+        """
+        Update nginx and certbot
+        """
+        self.reload()
+        d = task.cooperate(self.ensurePEM(vh) for vh in
+                self._virtualHosts.values()).whenDone()
+        d.addCallback(lambda _: self.showHosts())
 
     def showHosts(self):
+        """
+        Display a formatted listing of all virtual hosts, with TLS status and
+        associated containers
+        """
         print "Now:"
         for k, vh in self._virtualHosts.items():
             tls = '[TLS]' if vh.hasPEM else ''
@@ -128,7 +134,7 @@ class EventWatcher(object):
         Run certbot to get the PEM for this vhost, if necessary
         """
         if vhost.hasPEM:
-            return
+            return defer.succeed(None)
 
         pathCertbot = which('certbot')[0]
         args = shlex.split(
@@ -144,16 +150,17 @@ class EventWatcher(object):
                 )
             )
         print "Attempting to get cert for %r" % vhost.public_hostname
-        d = utils.getProcessOutputAndValue(pathCertbot, args)
-        d.addCallback(self.onCertbot, vhost).addErrback(log.err)
+        return utils.getProcessOutputAndValue(pathCertbot, args
+                ).addCallback(self.onCertbot, vhost
+                ).addErrback(log.err)
 
     def onCertbot(self, (out, err, code), vhost):
         bad = "certbot failed:\n%r\n%r\n" % (out, err)
         assert code == 0 and 'Congratulations' in out,  bad
 
         self.render()
-        self.reload()
-        self.showHosts()
+        self._postRender()
+
 
 def main():
     ew = EventWatcher()

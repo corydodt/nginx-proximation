@@ -1,4 +1,3 @@
-awscli
 certbot>=0.11.1
 circus
 docker
