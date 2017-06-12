@@ -1,5 +1,6 @@
 certbot>=0.11.1
 circus
+codado>=0.4.1
 docker
 jinja2
 pyflakes

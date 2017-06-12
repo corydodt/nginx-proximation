@@ -8,7 +8,6 @@ prox=/opt/Proximation
 docker run -d \
     -v `pwd`/proximation.py:$prox/proximation.py \
     -v `pwd`/http.conf.in:$prox/http.conf.in \
-    -v `pwd`/codado:$prox/codado \
     -v `pwd`/doc/experimental/run-certbot:$prox/run-certbot \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v `pwd`/letsencrypt:/etc/letsencrypt \
