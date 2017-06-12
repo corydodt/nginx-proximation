@@ -5,9 +5,15 @@
 # {{ '-' * vhost.public_hostname|length }}
 
 upstream {{ vhost.public_hostname }} {
-    {%- for upstream in vhost.containers %}
-    # TODO: make port 8080 configurable
-    server {{ upstream.attrs.NetworkSettings.IPAddress }}:8080;
+    {%- for upstream in vhost.containers -%}
+    {%- set upstreamPortMapping = upstream.attrs.NetworkSettings.Ports %}
+    {% if vhost.virtual_port in upstreamPortMapping %}
+    {% set upstreamPort = upstreamPortMapping[vhost.virtual_port][0]['HostPort'] %}
+    {% else %}
+    {% set upstreamPort = '8080' %}
+    {% endif %}
+    {% set upstreamIP = upstream.attrs.NetworkSettings.IPAddress %}
+    server {{ upstreamIP }}:{{ upstreamPort }};
     {%- endfor %}
 }
 

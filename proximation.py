@@ -24,12 +24,21 @@ LETSENCRYPT_LIVE = '/etc/letsencrypt/live'
 NGINX_WEBROOT = '/usr/share/nginx/html'
 
 
+def canonicalizeVirtualPort(n):
+    """
+    Returns a string in the format used by docker container NetworkSettings
+    """
+    n = str(n)
+    return "%s/tcp" % n if "/" not in n else n
+
+
 @attr.s
 class VHost(object):
     """
     A record of a vhost being tracked by proximation
     """
     public_hostname = attr.ib()
+    virtual_port = attr.ib(convert=canonicalizeVirtualPort, default='8080/tcp')
     containers = attr.ib(default=attr.Factory(set))
 
     @property
@@ -61,7 +70,8 @@ class EventWatcher(object):
             env = {k: v for (k, v) in (kv(s) for s in c.attrs['Config']['Env'])}
             if u'virtual_host' in env:
                 public_hostname = env[u'virtual_host']
-                vh = vhosts.get(public_hostname) or VHost(public_hostname=public_hostname)
+                virtual_port = env[u'virtual_port']
+                vh = vhosts.get(public_hostname) or VHost(public_hostname=public_hostname, virtual_port=virtual_port)
                 vh.containers.add(c)
                 vhosts[public_hostname] = vh
 
@@ -105,8 +115,12 @@ class EventWatcher(object):
         print "Now:"
         for k, vh in self._virtualHosts.items():
             tls = '[TLS]' if vh.hasPEM else ''
-            conts = [c.attrs['Config']['Hostname'] for c in vh.containers]
-            print "  %s%s: %s" % (k, tls, ' '.join(conts))
+            hostports = []
+            for c in vh.containers:
+                hostports.append(
+                    '%s:%s' % (c.attrs['Config']['Hostname'], vh.virtual_port)
+                    )
+            print u"  %s%s: %s" % (k, tls, u' '.join(hostports))
 
     def reload(self):
         """
