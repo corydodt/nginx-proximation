@@ -1,5 +1,5 @@
 # vim:set ft=dockerfile:
-FROM corydodt/circus-base
+FROM corydodt/circus-base:0.1
 
 RUN mkdir -p /usr/share/nginx/html /run/nginx /opt/Proximation /etc/letsencrypt/live
 ENV PYTHONPATH=/opt/Proximation

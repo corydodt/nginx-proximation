@@ -129,3 +129,6 @@ Errors from certbot will also be displayed in the log output.
   you mount /etc/letsencrypt as a volume from outside, you can tear down
   nginx-proximation itself, and restart it, without losing any state.
 
+## Release Notes
+
+* 0.1.2: Bump to corydodt/circus-base:0.1
