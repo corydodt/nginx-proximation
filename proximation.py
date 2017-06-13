@@ -49,8 +49,8 @@ class VHost(object):
         """
         Return the exposed IP and exposed port of the container
         """
-        mapped_ip = container.attrs.NetworkSettings.IPAddress
-        mapped_port = container.attrs.NetworkSettings.Ports[self.private_port][0]['HostPort']
+        mapped_ip = container.attrs['NetworkSettings']['IPAddress']
+        mapped_port = container.attrs['NetworkSettings']['Ports'][self.private_port][0]['HostPort']
         return (mapped_ip, mapped_port)
 
 
