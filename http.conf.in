@@ -6,13 +6,13 @@
 
 upstream {{ vhost.public_hostname }} {
     {%- for upstream in vhost.containers -%}
-    {%- set upstreamPortMapping = upstream.attrs.NetworkSettings.Ports %}
-    {% if vhost.virtual_port in upstreamPortMapping %}
-    {% set upstreamPort = upstreamPortMapping[vhost.virtual_port][0]['HostPort'] %}
-    {% else %}
-    {% set upstreamPort = '8080' %}
-    {% endif %}
-    {% set upstreamIP = upstream.attrs.NetworkSettings.IPAddress %}
+    {%-     set upstreamPortMapping = upstream.attrs.NetworkSettings.Ports -%}
+    {%-     if vhost.virtual_port in upstreamPortMapping -%}
+    {%-         set upstreamPort = upstreamPortMapping[vhost.virtual_port][0]['HostPort'] -%}
+    {%-     else -%}
+    {%-         set upstreamPort = '8080' -%}
+    {%-     endif -%}
+    {%-     set upstreamIP = upstream.attrs.NetworkSettings.IPAddress %}
     server {{ upstreamIP }}:{{ upstreamPort }};
     {%- endfor %}
 }
@@ -26,9 +26,7 @@ server {
         index index.html index.htm;
     }
 
-
-{% if vhost.hasPEM -%}
-
+{%- if vhost.hasPEM %}
     location ~ /.* {
         proxy_pass http://{{ vhost.public_hostname }};
     }

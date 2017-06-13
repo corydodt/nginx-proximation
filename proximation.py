@@ -169,6 +169,9 @@ class EventWatcher(object):
                 ).addErrback(log.err)
 
     def onCertbot(self, (out, err, code), vhost):
+        """
+        When certbot setup has completed, refresh nginx
+        """
         bad = "certbot failed:\n%r\n%r\n" % (out, err)
         assert code == 0 and 'Congratulations' in out,  bad
 
