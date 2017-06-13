@@ -57,13 +57,27 @@ docker run -d \
     corydodt/nginx-proximation:latest
 ```
 
-4. Launch other containers, using the `virtual_host` environment variable.
+4. Launch other containers, using the `public_hostname` environment variable.
+   You will additionally need to expose a port in your other containers.
+   Use `private_port` to specify the port you want to be proxied.
 
 ```
 docker run -d \
-  -e virtual_host=yourhost.yourdomain.com \
+  -p :9999 \
+  -e public_hostname=yourhost.yourdomain.com \
+  -e private_port=9999 \
   your/container:latest
 ```
+
+The command above will launch your/container:latest, exposing port 9999 (the
+port number inside the container), using an ARBITRARY port in the host. The
+environment variables specify that:
+- yourhost.yourdomain.com will be the certificate requested from certbot, and
+- port 9999/tcp will be mapped to nginx by proximation.
+
+Proximation finds the correct HostPort by inspecting attributes of the
+container and finding the exposed port that matches 9999/tcp. (This is usually
+something like 36799.)
 
 5. (Wait a few seconds for certbot to run, then ...) visit
    https://yourhost.yourdomain.com/
@@ -79,7 +93,7 @@ following:
 ```
 2017-06-08 06:22:40 [10] | Attempting to get cert for u'c00151ed.ngrok.io'
 2017-06-08 06:22:40 [10] | Now:
-2017-06-08 06:22:40 [10] |   c00151ed.ngrok.io: e8242d544ecd
+2017-06-08 06:22:40 [10] |   c00151ed.ngrok.io: e8242d544ecd:36799
 ```
 
 Each time this happens, nginx-proximation has:
@@ -98,7 +112,7 @@ you will see output like the following:
 
 ```
 2017-06-08 06:22:45 [10] | Now:
-2017-06-08 06:22:45 [10] |   c00151ed.ngrok.io[TLS]: e8242d544ecd
+2017-06-08 06:22:45 [10] |   c00151ed.ngrok.io[TLS]: e8242d544ecd:36799
 ```
 
 Errors from certbot will also be displayed in the log output.

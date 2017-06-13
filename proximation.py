@@ -38,12 +38,20 @@ class VHost(object):
     A record of a vhost being tracked by proximation
     """
     public_hostname = attr.ib()
-    virtual_port = attr.ib(convert=canonicalizeVirtualPort, default='8080/tcp')
+    private_port = attr.ib(convert=canonicalizeVirtualPort, default='8080/tcp')
     containers = attr.ib(default=attr.Factory(set))
 
     @property
     def hasPEM(self):
         return os.path.isdir('%s/%s' % (LETSENCRYPT_LIVE, self.public_hostname))
+
+    def mappedAddress(self, container):
+        """
+        Return the exposed IP and exposed port of the container
+        """
+        mapped_ip = container.attrs.NetworkSettings.IPAddress
+        mapped_port = container.attrs.NetworkSettings.Ports[vhost.private_port][0]['HostPort']
+        return (mapped_ip, mapped_port)
 
 
 @attr.s
@@ -68,10 +76,12 @@ class EventWatcher(object):
         kv = lambda s: s.split('=', 1)
         for c in running:
             env = {k: v for (k, v) in (kv(s) for s in c.attrs['Config']['Env'])}
-            if u'virtual_host' in env:
-                public_hostname = env[u'virtual_host']
-                virtual_port = env[u'virtual_port']
-                vh = vhosts.get(public_hostname) or VHost(public_hostname=public_hostname, virtual_port=virtual_port)
+            if u'public_hostname' in env:
+                public_hostname = env[u'public_hostname']
+                private_port = env[u'private_port']
+                vh = vhosts.get(public_hostname) or
+                VHost(public_hostname=public_hostname,
+                        private_port=private_port)
                 vh.containers.add(c)
                 vhosts[public_hostname] = vh
 
@@ -117,8 +127,9 @@ class EventWatcher(object):
             tls = '[TLS]' if vh.hasPEM else ''
             hostports = []
             for c in vh.containers:
+                ip, port = vh.mappedAddress(c)
                 hostports.append(
-                    '%s:%s' % (c.attrs['Config']['Hostname'], vh.virtual_port)
+                    '%s:%s' % (c.attrs['Config']['Hostname'], port)
                     )
             print u"  %s%s: %s" % (k, tls, u' '.join(hostports))
 
