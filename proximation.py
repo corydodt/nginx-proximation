@@ -50,7 +50,7 @@ class VHost(object):
         Return the exposed IP and exposed port of the container
         """
         mapped_ip = container.attrs.NetworkSettings.IPAddress
-        mapped_port = container.attrs.NetworkSettings.Ports[vhost.private_port][0]['HostPort']
+        mapped_port = container.attrs.NetworkSettings.Ports[self.private_port][0]['HostPort']
         return (mapped_ip, mapped_port)
 
 
@@ -79,9 +79,10 @@ class EventWatcher(object):
             if u'public_hostname' in env:
                 public_hostname = env[u'public_hostname']
                 private_port = env[u'private_port']
-                vh = vhosts.get(public_hostname) or
-                VHost(public_hostname=public_hostname,
-                        private_port=private_port)
+                vh = vhosts.get(public_hostname) or VHost(
+                        public_hostname=public_hostname,
+                        private_port=private_port
+                        )
                 vh.containers.add(c)
                 vhosts[public_hostname] = vh
 
