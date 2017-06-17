@@ -6,7 +6,7 @@
 
 upstream {{ vhost.public_hostname }} {
     {%- for upstream in vhost.containers -%}
-    {%- set address = vhost.mappedAddress(upstream) -%}
+    {%- set address = vhost.mappedAddress(upstream) %}
     server {{ address[0] }}:{{ address[1] }};
     {%- endfor %}
 }
