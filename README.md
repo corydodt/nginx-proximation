@@ -132,3 +132,4 @@ Errors from certbot will also be displayed in the log output.
 ## Release Notes
 
 * 0.1.2: Bump to corydodt/circus-base:0.1
+* 0.1.3: Route to the right port on the upstream container

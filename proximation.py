@@ -24,21 +24,13 @@ LETSENCRYPT_LIVE = '/etc/letsencrypt/live'
 NGINX_WEBROOT = '/usr/share/nginx/html'
 
 
-def canonicalizeVirtualPort(n):
-    """
-    Returns a string in the format used by docker container NetworkSettings
-    """
-    n = str(n)
-    return "%s/tcp" % n if "/" not in n else n
-
-
 @attr.s
 class VHost(object):
     """
     A record of a vhost being tracked by proximation
     """
     public_hostname = attr.ib()
-    private_port = attr.ib(convert=canonicalizeVirtualPort, default='8080/tcp')
+    private_port = attr.ib(default='8080')
     containers = attr.ib(default=attr.Factory(set))
 
     @property
@@ -47,10 +39,10 @@ class VHost(object):
 
     def mappedAddress(self, container):
         """
-        Return the exposed IP and exposed port of the container
+        Return the exposed IP and private port of the container
         """
         mapped_ip = container.attrs['NetworkSettings']['IPAddress']
-        mapped_port = container.attrs['NetworkSettings']['Ports'][self.private_port][0]['HostPort']
+        mapped_port = self.private_port
         return (mapped_ip, mapped_port)
 
 
